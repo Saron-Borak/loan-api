@@ -1,0 +1,29 @@
+# Git and editor/dev configuration
+.git
+.gitignore
+.github
+.devcontainer
+.vscode
+.idea
+
+# Python caches and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Local models: the image trains its own; others are mounted at run time
+model.joblib
+models/
+
+# Not needed inside the image
+tests/
+Dockerfile*
+compose.yaml
+init.sql
+CHECKLIST.md
+*.md
+scripts/
+evidence/
