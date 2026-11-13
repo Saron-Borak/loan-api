@@ -1,0 +1,42 @@
+# ---------- Stage 1: build the dependencies and train the model ----------
+FROM python:3.12-slim AS builder
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
+
+WORKDIR /build
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY train.py .
+RUN python train.py --version 1.0.0 --out /build/model.joblib
+
+
+# ---------- Stage 2: the small runtime image ----------
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    MODEL_PATH=/app/model.joblib
+
+# Non-root user: a compromised app cannot change system files or install software
+RUN useradd --create-home --uid 10001 appuser
+
+WORKDIR /app
+
+# Only what the API needs at run time; train.py and the build tools stay in stage 1
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /build/model.joblib /app/model.joblib
+COPY main.py schemas.py ./
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"
+
+CMD ["fastapi", "run", "main.py", "--host", "0.0.0.0", "--port", "8000"]
